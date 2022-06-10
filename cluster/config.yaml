@@ -1,0 +1,80 @@
+# a config for a test cluster
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: eks-demo
+  region: ap-southeast-2
+  version: "1.22"
+  tags:
+    karpenter.sh/discovery: eks-demo
+    auto-stop: "no"
+    auto-delete: "no"
+
+kubernetesNetworkConfig:
+  ipFamily: IPv4
+
+addons:
+  - name: vpc-cni
+    version: latest
+    attachPolicyARNs:
+      - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+
+karpenter:
+  version: '0.9.0'
+  createServiceAccount: true
+
+iam:
+  withOIDC: true
+  serviceAccounts:
+  - metadata:
+      name: aws-load-balancer-controller
+      namespace: kube-system
+    wellKnownPolicies:
+      awsLoadBalancerController: true
+  - metadata:
+      name: ebs-csi-controller-sa
+      namespace: kube-system
+    wellKnownPolicies:
+      ebsCSIController: true
+  - metadata:
+      name: external-dns
+      namespace: kube-system
+    wellKnownPolicies:
+      externalDNS: true
+
+fargateProfiles:
+  - name: fp-default
+    selectors:
+      # All workloads in the "fargate"" namespace will be
+      # scheduled onto Fargate:
+      - namespace: fargate
+  - name: fp-karpenter
+    selectors:
+      # Run Karpenter on Fargate
+      - namespace: karpenter
+
+managedNodeGroups:
+  - name: eks-demo-base-ng
+    minSize: 3
+    maxSize: 6
+    instanceSelector:
+      cpuArchitecture: arm64
+      memory: 2G
+    disableIMDSv1: true
+    disablePodIMDS: true
+    propagateASGTags: true
+    tags:
+      auto-stop: "no"
+      auto-delete: "no"
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["all"]
+    logRetentionInDays: 60
+
